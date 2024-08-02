@@ -1,6 +1,6 @@
 import pygame
 from sim import Simulation
-from render import Render
+from render import Render, Camera
 from grid import render_grid
 
 simulation = Simulation()
@@ -10,9 +10,13 @@ running = True
 pygame.init()
 screen = pygame.display.set_mode((1280, 720), pygame.RESIZABLE)
 clock = pygame.time.Clock()
-render = Render(screen)
+camera = Camera()
+render = Render(screen, camera)
 
 records = []
+
+drag_mouse_start = None
+drag_camera_start = None
 
 try: 
     while running:
@@ -20,6 +24,24 @@ try:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
+
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                drag_mouse_start = pygame.Vector2(pygame.mouse.get_pos())
+                drag_camera_start = camera.pos
+            
+            if drag_mouse_start is not None and event.type == pygame.MOUSEMOTION:
+                now = pygame.Vector2(pygame.mouse.get_pos())
+                delta = render.untransform_delta(drag_mouse_start - now)
+                camera.pos = drag_camera_start + delta
+                
+            if event.type == pygame.MOUSEBUTTONUP:
+                drag_mouse_start = None
+
+            if event.type == pygame.MOUSEWHEEL:
+                if event.y > 0:
+                    camera.zoom *= 1.1
+                elif event.y < 0:
+                    camera.zoom /= 1.1
 
             if event.type == pygame.VIDEORESIZE:
                 render.resize()

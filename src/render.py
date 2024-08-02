@@ -25,6 +25,14 @@ class Camera:
     def transform_size(self, size: float) -> float:
         return size * self.zoom
     
+    def untransform_point(self, point: pygame.Vector2):
+        point.y *= -1
+        return point / self.zoom - self.pos
+    
+    def untransform_delta(self, delta: pygame.Vector2):
+        delta.y *= -1
+        return delta / self.zoom
+    
 class Render:
     camera: Camera
     screen: pygame.Surface
@@ -83,7 +91,7 @@ class Render:
             width = int(self.transform_size(width))
 
         if transform:
-            y = self.transform_x(x)
+            x = self.transform_x(x)
         
         pygame.draw.line(self.screen, color, (x, 0), (x, self.height), width)
 
@@ -106,3 +114,9 @@ class Render:
 
     def get_padding(self):
         return self.width - self.pixels / 2, self.height - self.pixels / 2
+    
+    def untransform_point(self, point: pygame.Vector2):
+        return self.offset - self.camera.untransform_point(point / self.pixels)
+    
+    def untransform_delta(self, delta: pygame.Vector2):
+        return self.camera.untransform_delta(delta / self.pixels)
