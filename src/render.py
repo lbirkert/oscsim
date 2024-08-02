@@ -15,11 +15,9 @@ class Camera:
         return self.zoom * (point - self.pos)
     
     def transform_size(self, size: float) -> float:
-        return float * self.zoom
+        return size * self.zoom
 
-
-
-class Renderer:
+class Render:
     camera: Camera
     screen: pygame.Surface
     width: float
@@ -34,19 +32,22 @@ class Renderer:
         self.camera = camera
         self.resize()
 
-
-    def draw_circle(self, center, radius):
-        pygame.draw.circle(self.screen, (255, 0, 0),
+    def draw_circle(self, color, center, radius):
+        pygame.draw.circle(self.screen, color,
                            self.transform_point(center), self.transform_size(radius))
+    
+    def draw_lines(self, color, closed, points, width=1):
+        points = [self.transform_point(x) for x in points]
+        pygame.draw.lines(self.screen, color, closed, points, self.transform_size(width))
+
+    def draw_line(self, color, start, end, width=1):
+        pygame.draw.line(self.screen, color, start, end, width)
 
     def transform_point(self, point: pygame.Vector2) -> pygame.Vector2:
-        self.transform_pixels(self.camera.transform_point(point))
+        return self.offset + self.pixels * self.camera.transform_point(point)
     
     def transform_size(self, size: float) -> float:
-        self.transform_pixels(self.camera.transform_size(size))
-    
-    def transform_pixels(self, screen_coords):
-        self.offset + screen_coords * self.pixels
+        return self.pixels * self.camera.transform_size(size)
     
     def resize(self):
         self.width, self.height = self.screen.get_size()

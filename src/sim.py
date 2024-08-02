@@ -1,8 +1,10 @@
 from typing import List, Tuple
 from abc import ABC, abstractmethod
+from render import Render
 import pygame
 import threading
 import time
+import math
 
 # describes how fine the simulation runs
 TIMESTEP = 0.01
@@ -23,6 +25,8 @@ class Anchor:
     def __init__(self, pos=(0,0), vel=(0,0), static=False, mass=1):
         self.pos = pygame.Vector2(pos)
         self.vel = pygame.Vector2(vel)
+        self.static = static
+        self.mass = mass
         self.coef = 0 if static else 1 / mass
     
     # Apply a force to this anchor
@@ -33,6 +37,12 @@ class Anchor:
     # Update the position of this anchor
     def update(self):
         self.pos += TIMESTEP * self.vel
+
+    def render(self, render: Render):
+        SIZE_RATIO = 0.1
+        radius = math.sqrt(self.mass) * SIZE_RATIO
+        color = (100, 100, 100) if self.static else (255, 255, 255)
+        render.draw_circle(color, self.pos, radius)
 
 class Spring(ABC):
     start: Anchor
@@ -53,6 +63,10 @@ class Spring(ABC):
         start_force, end_force = self.force()
         self.start.apply(start_force)
         self.end.apply(end_force)
+    
+    def render(self, render: Render):
+        # TODO
+        pass
 
 # A spring whose foce applied when compressed is proportional to the compressed distance
 class HookesSpring(Spring):
