@@ -86,7 +86,7 @@ class Spring(ABC):
 
         points.append(self.end.pos)
 
-        render.draw_lines((255, 0, 0), False, points, width=0.05)
+        render.draw_lines((100, 100, 0), False, points, width=0.05)
 
 # A spring whose foce applied when compressed is proportional to the compressed distance
 class HookesSpring(Spring):
@@ -107,8 +107,11 @@ class QuadraticSpring(Spring):
     
     # Returns the force this spring applies on start and end
     def force(self) -> Tuple[Force, Force]:
-        dir = (self.end.pos - self.start.pos)
-        return Force.pair(dir.scale_to_length(dir.magnitude_squared()) * self.stiffness)
+        delta = (self.end.pos - self.start.pos)
+        dist = delta.magnitude()
+        if dist == 0:
+            return Force.pair((0, 0))
+        return Force.pair(delta * dist * self.stiffness)
 
 
 class Simulation(threading.Thread):
@@ -123,11 +126,17 @@ class Simulation(threading.Thread):
 
         self.gravity = Force((0, -9.81))
         self.root_anchor = Anchor((0, 0), static=True)
-        self.anchors = [self.root_anchor, Anchor((0, 2), vel=(2, 0)), Anchor((1, 0))]
-        self.springs = [
-            HookesSpring(stiffness=5, start=self.anchors[0], end=self.anchors[1]),
-            HookesSpring(stiffness=5, start=self.anchors[1], end=self.anchors[2]),
+        self.anchors = [
+            self.root_anchor,
+            Anchor((0, -1), vel=(0, 0)),
+            Anchor((1, 0))
         ]
+        self.springs = [
+            HookesSpring(stiffness=8, start=self.anchors[0], end=self.anchors[1]),
+            QuadraticSpring(stiffness=2, start=self.anchors[1], end=self.anchors[2]),
+            QuadraticSpring(stiffness=2, start=self.anchors[0], end=self.anchors[2]),
+        ]
+        self.records = []
     
     def stop(self):
         self._stop_event.set()
@@ -137,9 +146,11 @@ class Simulation(threading.Thread):
         return self._stop_event.is_set()
 
     def run(self):
+        i = 0
         while not self._stop_event.is_set():
             self.update()
             time.sleep(SIM_TO_REAL * TIMESTEP)
+            i += 1
 
     def update(self):
         # apply the forces from the springs
