@@ -1,10 +1,8 @@
 import pygame
-import pygame_gui
 from sim import Simulation
 from render import Render, Camera
 from grid import render_grid
 from ui import UI
-
 
 sim = Simulation()
 sim.start()
@@ -13,9 +11,10 @@ running = True
 pygame.init()
 screen = pygame.display.set_mode((1280, 720), pygame.RESIZABLE)
 clock = pygame.time.Clock()
+
 camera = Camera()
 render = Render(screen, camera)
-ui = UI()
+ui = UI(screen, sim)
 
 records = []
 

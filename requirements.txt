@@ -1,2 +1,4 @@
 pygame==2.6.0
-imgui==2.0.0
+thorpy
+numpy
+pillow

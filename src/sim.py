@@ -142,6 +142,7 @@ class HyperbolicSpring(Spring):
 class Simulation(threading.Thread):
     root_anchor: Anchor
     gravity: Force
+    gravity_enabled: bool
     anchors: List[Anchor]
     springs: List[Spring]
 
@@ -149,6 +150,7 @@ class Simulation(threading.Thread):
         super(Simulation, self).__init__(*args, **kwargs)
         self._stop_event = threading.Event()
 
+        self.gravity_enabled = True
         self.gravity = Force((0, -9.81))
         self.root_anchor = Anchor((0, 0), static=True)
         self.anchors = [
@@ -182,9 +184,10 @@ class Simulation(threading.Thread):
         for spring in self.springs:
             spring.apply()
 
-        # apply gravity
-        for anchor in self.anchors:
-            anchor.apply(self.gravity)
+        if self.gravity_enabled:
+            # apply gravity
+            for anchor in self.anchors:
+                anchor.apply(self.gravity)
         
         # update positions
         for anchor in self.anchors:
