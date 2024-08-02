@@ -6,13 +6,15 @@ class Camera:
     # zoom level
     zoom: float
 
-    def __init__(self, pos=(0, 0), zoom=0.01):
+    def __init__(self, pos=(0, 0), zoom=0.05):
         self.pos = pygame.Vector2(pos)
         self.zoom = zoom
 
     # transforms point into screen coords
     def transform_point(self, point: pygame.Vector2) -> pygame.Vector2:
-        return self.zoom * (point - self.pos)
+        coord = self.zoom * (point - self.pos)
+        coord.y *= -1 # invert y-coordinate
+        return coord
     
     def transform_size(self, size: float) -> float:
         return size * self.zoom
@@ -38,10 +40,10 @@ class Render:
     
     def draw_lines(self, color, closed, points, width=1):
         points = [self.transform_point(x) for x in points]
-        pygame.draw.lines(self.screen, color, closed, points, self.transform_size(width))
+        pygame.draw.lines(self.screen, color, closed, points, int(self.transform_size(width)))
 
     def draw_line(self, color, start, end, width=1):
-        pygame.draw.line(self.screen, color, start, end, width)
+        pygame.draw.line(self.screen, color, start, end, int(self.transform_size(width)))
 
     def transform_point(self, point: pygame.Vector2) -> pygame.Vector2:
         return self.offset + self.pixels * self.camera.transform_point(point)
@@ -52,4 +54,4 @@ class Render:
     def resize(self):
         self.width, self.height = self.screen.get_size()
         self.pixels = min(self.width, self.height)
-        self.offset = pygame.Vector2(self.width - self.pixels, self.height - self.pixels) / 2
+        self.offset = pygame.Vector2(self.width, self.height) / 2

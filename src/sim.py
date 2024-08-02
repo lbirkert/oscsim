@@ -26,6 +26,7 @@ class Anchor:
         self.pos = pygame.Vector2(pos)
         self.vel = pygame.Vector2(vel)
         self.static = static
+        # in kilograms
         self.mass = mass
         self.coef = 0 if static else 1 / mass
     
@@ -39,7 +40,7 @@ class Anchor:
         self.pos += TIMESTEP * self.vel
 
     def render(self, render: Render):
-        SIZE_RATIO = 0.1
+        SIZE_RATIO = 0.10876
         radius = math.sqrt(self.mass) * SIZE_RATIO
         color = (100, 100, 100) if self.static else (255, 255, 255)
         render.draw_circle(color, self.pos, radius)
@@ -65,13 +66,32 @@ class Spring(ABC):
         self.end.apply(end_force)
     
     def render(self, render: Render):
-        # TODO
-        pass
+        SPRING_WIDTH = 0.2
+        SEGS = 20
+        delta = self.end.pos - self.start.pos
+        dist = delta.magnitude()
+        if dist == 0:
+            return
+        delta_n = delta / dist
+        normal = pygame.Vector2(-delta_n.y, delta_n.x)
+
+        points = []
+        points.append(self.start.pos)
+
+        # 10 zigzag segments
+        for i in range(1, SEGS):
+            off_delta = (i / SEGS) * delta
+            off_normal = SPRING_WIDTH * (normal if i % 2 == 0 else -normal)
+            points.append(self.start.pos + off_delta + off_normal)
+
+        points.append(self.end.pos)
+
+        render.draw_lines((255, 0, 0), False, points, width=0.05)
 
 # A spring whose foce applied when compressed is proportional to the compressed distance
 class HookesSpring(Spring):
-    def __init__(self, stiffness: float, start=Anchor((0, 0)), end=None):
-        super().__init__(start, end)
+    def __init__(self, stiffness: float, **kwargs):
+        super().__init__(**kwargs)
         self.stiffness = stiffness
     
     # Returns the force this spring applies on start and end
@@ -80,8 +100,8 @@ class HookesSpring(Spring):
 
 # A spring whose foce applied when compressed is quadratic to the compressed distance
 class QuadraticSpring(Spring):
-    def __init__(self, stiffness: float, start=Anchor((0, 0)), end=None):
-        super().__init__(start, end)
+    def __init__(self, stiffness: float, **kwargs):
+        super().__init__(**kwargs)
         self.stiffness = stiffness
 
     
@@ -93,6 +113,7 @@ class QuadraticSpring(Spring):
 
 class Simulation(threading.Thread):
     root_anchor: Anchor
+    gravity: Force
     anchors: List[Anchor]
     springs: List[Spring]
 
@@ -100,9 +121,13 @@ class Simulation(threading.Thread):
         super(Simulation, self).__init__(*args, **kwargs)
         self._stop_event = threading.Event()
 
+        self.gravity = Force((0, -9.81))
         self.root_anchor = Anchor((0, 0), static=True)
-        self.anchors = [self.root_anchor]
-        self.springs = []
+        self.anchors = [self.root_anchor, Anchor((0, 2), vel=(2, 0)), Anchor((1, 0))]
+        self.springs = [
+            HookesSpring(stiffness=5, start=self.anchors[0], end=self.anchors[1]),
+            HookesSpring(stiffness=5, start=self.anchors[1], end=self.anchors[2]),
+        ]
     
     def stop(self):
         self._stop_event.set()
@@ -117,8 +142,14 @@ class Simulation(threading.Thread):
             time.sleep(SIM_TO_REAL * TIMESTEP)
 
     def update(self):
+        # apply the forces from the springs
         for spring in self.springs:
             spring.apply()
+
+        # apply gravity
+        for anchor in self.anchors:
+            anchor.apply(self.gravity)
         
+        # update positions
         for anchor in self.anchors:
             anchor.update()

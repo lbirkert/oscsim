@@ -9,28 +9,30 @@ running = True
 pygame.init()
 screen = pygame.display.set_mode((1280, 720), pygame.RESIZABLE)
 clock = pygame.time.Clock()
-width, height = screen.get_size()
 render = Render(screen)
-    
-while running:
-    # process events sent by pygame
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            running = False
+
+try: 
+    while running:
+        # process events sent by pygame
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+
+            if event.type == pygame.VIDEORESIZE:
+                render.resize()
+
+        screen.fill("black")
         
-        if event.type == pygame.VIDEORESIZE:
-            width, height = screen.get_size()
+        for spring in simulation.springs:
+            spring.render(render)
 
-    screen.fill("black")
+        for anchor in simulation.anchors:
+            anchor.render(render)
 
-    for anchor in simulation.anchors:
-        anchor.render(render)
-
-    for spring in simulation.springs:
-        spring.render(render)
-    
-    pygame.display.flip()
-    clock.tick(60)
+        pygame.display.flip()
+        clock.tick(60)
+except KeyboardInterrupt:
+    print("stopping...")
 
 pygame.quit()
 simulation.stop()
