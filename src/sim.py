@@ -52,13 +52,28 @@ class Spring(ABC):
     def __init__(self, **kwargs):
         self.start = kwargs.get("start", Anchor((0, 0)))
         self.end = kwargs.get("end", Anchor(self.start.pos))
+        self.max_force = kwargs.get("max_force")
+        self.min_force = kwargs.get("min_force")
 
         assert isinstance(self.start, Anchor)
         assert isinstance(self.end, Anchor)
 
+    # returns the magnitude of the force this spring applies based on the compression
     @abstractmethod
-    def force(self) -> Tuple[Force, Force]:
+    def magnitude(self, dist: float) -> float:
         pass
+
+    def force(self) -> Tuple[Force, Force]:
+        delta = self.end.pos - self.start.pos
+        dist = delta.magnitude()
+        if dist == 0:
+            return Force.pair((0, 0))
+        magnitude = self.magnitude(dist)
+        if self.max_force is not None:
+            magnitude = min(self.max_force, magnitude)
+        if self.min_force is not None:
+            magnitude = max(self.min_force, magnitude)
+        return Force.pair(delta * (magnitude / dist))
 
     def apply(self):
         start_force, end_force = self.force()
@@ -94,9 +109,8 @@ class HookesSpring(Spring):
         super().__init__(**kwargs)
         self.stiffness = stiffness
     
-    # Returns the force this spring applies on start and end
-    def force(self) -> Tuple[Force, Force]:
-        return Force.pair((self.end.pos - self.start.pos) * self.stiffness)
+    def magnitude(self, dist: float) -> float:
+        return dist * self.stiffness
 
 # A spring whose foce applied when compressed is quadratic to the compressed distance
 class QuadraticSpring(Spring):
@@ -104,15 +118,26 @@ class QuadraticSpring(Spring):
         super().__init__(**kwargs)
         self.stiffness = stiffness
 
-    
-    # Returns the force this spring applies on start and end
-    def force(self) -> Tuple[Force, Force]:
-        delta = (self.end.pos - self.start.pos)
-        dist = delta.magnitude()
-        if dist == 0:
-            return Force.pair((0, 0))
-        return Force.pair(delta * dist * self.stiffness)
+    def magnitude(self, dist: float) -> Tuple[Force, Force]:
+        return dist ** 2 * self.stiffness
 
+# A spring whose foce applied when compressed is constant
+class ConstantSpring(Spring):
+    def __init__(self, stiffness: float, **kwargs):
+        super().__init__(**kwargs)
+        self.stiffness = stiffness
+
+    def magnitude(self, _: float) -> Tuple[Force, Force]:
+        return self.stiffness
+
+# A spring whose foce applied when compressed is antiproportional to the compressed amount (with a maximum)
+class HyperbolicSpring(Spring):
+    def __init__(self, stiffness: float, **kwargs):
+        super().__init__(**kwargs)
+        self.stiffness = stiffness
+    
+    def magnitude(self, dist: float) -> Tuple[Force, Force]:
+        return self.stiffness / dist
 
 class Simulation(threading.Thread):
     root_anchor: Anchor
@@ -128,13 +153,13 @@ class Simulation(threading.Thread):
         self.root_anchor = Anchor((0, 0), static=True)
         self.anchors = [
             self.root_anchor,
-            Anchor((0, -1), vel=(0, 0)),
-            Anchor((1, 0))
+            Anchor((0, -1), vel=(2, 0)),
+            # Anchor((1, 0))
         ]
         self.springs = [
-            HookesSpring(stiffness=8, start=self.anchors[0], end=self.anchors[1]),
-            QuadraticSpring(stiffness=2, start=self.anchors[1], end=self.anchors[2]),
-            QuadraticSpring(stiffness=2, start=self.anchors[0], end=self.anchors[2]),
+            HyperbolicSpring(stiffness=200, max_force=100, start=self.anchors[0], end=self.anchors[1]),
+            # QuadraticSpring(stiffness=2, start=self.anchors[1], end=self.anchors[2]),
+            # QuadraticSpring(stiffness=2, start=self.anchors[0], end=self.anchors[2]),
         ]
         self.records = []
     
