@@ -1,10 +1,13 @@
 import pygame
+import pygame_gui
 from sim import Simulation
 from render import Render, Camera
 from grid import render_grid
+from ui import UI
 
-simulation = Simulation()
-simulation.start()
+
+sim = Simulation()
+sim.start()
 
 running = True
 pygame.init()
@@ -12,6 +15,7 @@ screen = pygame.display.set_mode((1280, 720), pygame.RESIZABLE)
 clock = pygame.time.Clock()
 camera = Camera()
 render = Render(screen, camera)
+ui = UI()
 
 records = []
 
@@ -20,8 +24,11 @@ drag_camera_start = None
 
 try: 
     while running:
+        time_delta = clock.tick(60) / 1000.0
+
         # process events sent by pygame
-        for event in pygame.event.get():
+        events = pygame.event.get()
+        for event in events:
             if event.type == pygame.QUIT:
                 running = False
 
@@ -45,18 +52,18 @@ try:
 
             if event.type == pygame.VIDEORESIZE:
                 render.resize()
-
+        
         screen.fill("black")
 
         render_grid(render)
         
-        for spring in simulation.springs:
+        for spring in sim.springs:
             spring.render(render)
 
-        for anchor in simulation.anchors:
+        for anchor in sim.anchors:
             anchor.render(render)
 
-        records.append(simulation.anchors[1].pos.copy())
+        records.append(sim.anchors[1].pos.copy())
 
         if len(records) > 2:
             recs = records[::-1]
@@ -66,11 +73,12 @@ try:
             render.draw_vline((255, 0, 0), recs[0].x)
             render.draw_lines((0, 0, 255), False, y_records)
             render.draw_hline((0, 0, 255), recs[0].y)
+        
+        ui.update(events)
 
         pygame.display.flip()
-        clock.tick(60)
 except KeyboardInterrupt:
     print("stopping...")
 
 pygame.quit()
-simulation.stop()
+sim.stop()
