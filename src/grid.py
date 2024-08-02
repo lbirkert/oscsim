@@ -5,9 +5,9 @@ def render_grid(render: Render):
     # TODO: make this dynamic
     GRID_SIZE = 0.004 / (10 ** math.floor(math.log10(render.camera.zoom)))
     COLORS = [
-        (20, 20, 20),
-        (40, 40, 40),
-        (60, 60, 60),
+        (10, 10, 10),
+        (30, 30, 30),
+        (50, 50, 50),
         (100, 100, 100),
     ]
     pad_x, pad_y = render.get_padding()
