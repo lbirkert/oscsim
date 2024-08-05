@@ -101,7 +101,7 @@ class Spring(ABC):
 
         points.append(self.end.pos)
 
-        render.draw_lines((100, 100, 0), False, points, width=0.05)
+        render.draw_lines((237, 248, 100), False, points, width=0.05)
 
 # A spring whose foce applied when compressed is proportional to the compressed distance
 class HookesSpring(Spring):
@@ -149,6 +149,7 @@ class Simulation(threading.Thread):
     def __init__(self,  *args, **kwargs):
         super(Simulation, self).__init__(*args, **kwargs)
         self._stop_event = threading.Event()
+        self._pause_event = threading.Event()
 
         self.gravity_enabled = True
         self.gravity = Force((0, -9.81))
@@ -165,19 +166,29 @@ class Simulation(threading.Thread):
         ]
         self.records = []
     
+    def toggle(self):
+        if self._pause_event.is_set():
+            self.resume()
+        else:
+            self.pause()
+
     def stop(self):
         self._stop_event.set()
-        pygame.quit()
+
+    def pause(self):
+        self._pause_event.set()
+
+    def resume(self):
+        self._pause_event.clear()
 
     def stopped(self):
         return self._stop_event.is_set()
 
     def run(self):
-        i = 0
         while not self._stop_event.is_set():
-            self.update()
+            if not self._pause_event.is_set():
+                self.update()
             time.sleep(SIM_TO_REAL * TIMESTEP)
-            i += 1
 
     def update(self):
         # apply the forces from the springs

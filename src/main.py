@@ -1,4 +1,5 @@
 import pygame
+import os
 from sim import Simulation
 from render import Render, Camera
 from grid import render_grid
@@ -21,6 +22,16 @@ records = []
 drag_mouse_start = None
 drag_camera_start = None
 
+imgs = {}
+
+for name in os.listdir("imgs"):
+    if not name.endswith(".png"):
+        continue
+
+    path = os.path.join("imgs", name)
+
+    imgs[name[:-4]] = pygame.image.load(path)
+
 try: 
     while running:
         time_delta = clock.tick(60) / 1000.0
@@ -33,6 +44,7 @@ try:
 
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_SPACE:
+                    sim.toggle()
                     ui.toggle_show()
 
             if event.type == pygame.MOUSEBUTTONDOWN:
@@ -77,6 +89,13 @@ try:
             render.draw_vline((255, 0, 0), recs[0].x)
             render.draw_lines((0, 0, 255), False, y_records)
             render.draw_hline((0, 0, 255), recs[0].y)
+
+        # add images
+
+        i = 64
+        for name in ["anchor", "constant", "proportional", "quadratic", "hyperbolic"]:
+            screen.blit(imgs[name], pygame.Rect((render.width - i, render.height - 64), (64, 64)))
+            i += 64
         
         ui.update(events)
 
