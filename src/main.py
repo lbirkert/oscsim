@@ -1,5 +1,6 @@
 import pygame
 import os
+import time
 from sim import Simulation, Anchor, ConstantSpring, HookesSpring, QuadraticSpring, HyperbolicSpring
 from render import Render, Camera
 from grid import render_grid
@@ -21,8 +22,16 @@ records = []
 
 drag_mouse_start = None
 drag_camera_start = None
+drag_start = 0
 drag_anchor = None
 
+# (icon_name, string_constructor)
+springs = [
+    ("constant", ConstantSpring),
+    ("proportional", HookesSpring),
+    ("quadratic", QuadraticSpring),
+    ("hyperbolic", HyperbolicSpring),
+]
 
 imgs = {}
 
@@ -37,6 +46,7 @@ for name in os.listdir("imgs"):
 try: 
     while running:
         time_delta = clock.tick(60) / 1000.0
+        selected = [x for x in sim.anchors if x.selected]
 
         # process events sent by pygame
         events = pygame.event.get()
@@ -50,22 +60,23 @@ try:
                     sim.toggle()
                     ui.toggle_show()
 
-            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                print(event)
+                if event.key == pygame.K_BACKSPACE:
+                    for anchor in sim.anchors[:]:
+                        if anchor.selected:
+                            sim.remove_anchor(anchor)
 
-                springs = [
-                    ConstantSpring,
-                    HookesSpring,
-                    QuadraticSpring,
-                    HyperbolicSpring,
-                ]
-                        
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                drag_start = time.time()
+
+                # discard selection if shift is not pressed
+                pressed = pygame.key.get_pressed()
+                unselect = not pressed[pygame.K_LSHIFT] and not pressed[pygame.K_RSHIFT]
+
+                # handle spring buttons
                 i = 128
-                for spring in springs:
+                for (_, spring) in springs:
                     rect = pygame.Rect((render.width - i, render.height - 64), (64, 64))
                     if rect.collidepoint(mouse_pos):
-                        selected = [x for x in sim.anchors if x.selected]
-                        print("SPRING!!")
                         for i in range(len(selected) - 1):
                             sim.springs.append(spring(start=selected[i], end=selected[i+1]))
                         break
@@ -74,15 +85,20 @@ try:
 
                 anchor_rect = pygame.Rect((render.width - 64, render.height - 64), (64, 64))
                 if anchor_rect.collidepoint(mouse_pos):
+                    if unselect:
+                        sim.unselect()
                     drag_anchor = Anchor(lock=True)
                     drag_anchor.selected = True
                     sim.anchors.append(drag_anchor)
 
                 for anchor in sim.anchors:
                     if anchor.get_rect(render).collidepoint(mouse_pos):
+                        if unselect:
+                            sim.unselect()
                         anchor.selected = True
                         anchor.lock()
                         drag_anchor = anchor
+                        break
 
                 if drag_anchor is None:
                     drag_mouse_start = mouse_pos
@@ -90,18 +106,22 @@ try:
             
             if event.type == pygame.MOUSEMOTION:
                 if drag_anchor is not None:
-                    drag_anchor.pos = render.untransform_point(mouse_pos)
-                    print(drag_anchor.pos)
+                    if not pygame.mouse.get_pressed()[0]:
+                        drag_anchor = None
+                    else:
+                        drag_anchor.pos = render.untransform_point(mouse_pos)
                 if drag_mouse_start is not None:
-                    delta = render.untransform_delta(drag_mouse_start - mouse_pos)
-                    camera.pos = drag_camera_start + delta
+                    if not pygame.mouse.get_pressed()[0]:
+                        drag_mouse_start = None
+                    else:
+                        delta = render.untransform_delta(drag_mouse_start - mouse_pos)
+                        camera.pos = drag_camera_start + delta
                 
             if event.type == pygame.MOUSEBUTTONUP:
                 if drag_mouse_start is not None:
                     if (drag_mouse_start - mouse_pos).magnitude_squared() < 10:
                         # unselect everything
-                        for anchor in sim.anchors:
-                            anchor.selected = False
+                        sim.unselect()
                     drag_mouse_start = None
 
                 if drag_anchor is not None:
@@ -127,29 +147,40 @@ try:
 
         for anchor in sim.anchors:
             anchor.render(render)
-
-        records.append(sim.anchors[1].pos.copy())
         
-        if len(records) > 200:
-            records.pop(0)
+        if len(selected) > 0:
+            anchor = selected[0]
+            records.append(anchor.pos.copy())
 
-        if len(records) > 2:
-            recs = records[::-1]
-            x_records = [(pos.x, i / 300) for (i, pos) in enumerate(recs)]
-            y_records = [(i / 300, pos.y) for (i, pos) in enumerate(recs)]
-            render.draw_lines((255, 0, 0), False, x_records)
-            render.draw_vline((255, 0, 0), recs[0].x)
-            render.draw_lines((0, 0, 255), False, y_records)
-            render.draw_hline((0, 0, 255), recs[0].y)
+            if len(records) > 200:
+                records.pop(0)
+
+            if len(records) > 2:
+                recs = records[::-1]
+                x_records = [(pos.x, i / 300) for (i, pos) in enumerate(recs)]
+                y_records = [(i / 300, pos.y) for (i, pos) in enumerate(recs)]
+                render.draw_lines((255, 0, 0), False, x_records)
+                render.draw_vline((255, 0, 0), recs[0].x)
+                render.draw_lines((0, 0, 255), False, y_records)
+                render.draw_hline((0, 0, 255), recs[0].y)
 
         # add images
-
         i = 64
-        for name in ["anchor", "constant", "proportional", "quadratic", "hyperbolic"]:
+        icons = ["anchor"]
+        icons.extend([x for (x, _) in springs])
+        for name in icons:
             screen.blit(imgs[name], pygame.Rect((render.width - i, render.height - 64), (64, 64)))
             i += 64
         
-        ui.update(events)
+        # hide UI when moving mouse
+        if drag_anchor is None and \
+            (drag_mouse_start is None or \
+                (drag_mouse_start - mouse_pos).magnitude_squared() < 10):
+            ui.update(events)
+
+            if len(selected) == 1:
+                ui.update_anchor(events, selected[0])
+
 
         pygame.display.flip()
 except KeyboardInterrupt:

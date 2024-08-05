@@ -30,17 +30,17 @@ class Anchor:
         self._static = static
         self._lock = lock
         # in kilograms
-        self.mass = mass
+        self._mass = mass
         self.selected = False
         self.update_coef()
         self.update_radius()
 
     def update_coef(self):
-        self.coef = 0 if self._static or self._lock else 1 / self.mass
+        self.coef = 0 if self._static or self._lock else 1 / self._mass
 
     def update_radius(self):
         SIZE_RATIO = 0.10876
-        self.radius = math.sqrt(self.mass) * SIZE_RATIO
+        self.radius = math.sqrt(self._mass) * SIZE_RATIO
     
     # Apply a force to this anchor
     # F = m * a
@@ -51,11 +51,22 @@ class Anchor:
     def update(self):
         self.pos += TIMESTEP * self.vel
 
+    def set_mass(self, val: float):
+        self._mass = val
+        self.update_coef()
+        self.update_radius()
+
+    def get_mass(self):
+        return self._mass
+
     def set_static(self, val: bool):
         self._static = val
         if self._static:
             self.vel = pygame.Vector2((0, 0))
         self.update_coef()
+    
+    def get_static(self):
+        return self._static
 
     def lock(self):
         self._lock = True
@@ -155,7 +166,7 @@ class QuadraticSpring(Spring):
         super().__init__(**kwargs)
         self.stiffness = stiffness
 
-    def magnitude(self, dist: float) -> Tuple[Force, Force]:
+    def magnitude(self, dist: float) -> float:
         return dist ** 2 * self.stiffness
 
 # A spring whose foce applied when compressed is constant
@@ -164,7 +175,7 @@ class ConstantSpring(Spring):
         super().__init__(**kwargs)
         self.stiffness = stiffness
 
-    def magnitude(self, _: float) -> Tuple[Force, Force]:
+    def magnitude(self, _: float) -> float:
         return self.stiffness
 
 # A spring whose foce applied when compressed is antiproportional to the compressed amount (with a maximum)
@@ -173,12 +184,12 @@ class HyperbolicSpring(Spring):
         super().__init__(**kwargs)
         self.stiffness = stiffness
     
-    def magnitude(self, dist: float) -> Tuple[Force, Force]:
+    def magnitude(self, dist: float) -> float:
         return self.stiffness / dist
 
 class Simulation(threading.Thread):
     root_anchor: Anchor
-    gravity: Force
+    gravity: pygame.Vector2
     gravity_enabled: bool
     anchors: List[Anchor]
     springs: List[Spring]
@@ -189,7 +200,7 @@ class Simulation(threading.Thread):
         self._pause_event = threading.Event()
 
         self.gravity_enabled = True
-        self.gravity = Force((0, -9.81))
+        self.gravity = pygame.Vector2(0, -9.81)
         self.root_anchor = Anchor((0, 0), static=True)
         self.anchors = [
             self.root_anchor,
@@ -227,10 +238,22 @@ class Simulation(threading.Thread):
                 self.update()
             time.sleep(SIM_TO_REAL * TIMESTEP)
 
+    def unselect(self):
+        for anchor in self.anchors:
+            anchor.selected = False
+
+    def remove_anchor(self, anchor: Anchor):
+        for spring in self.springs[:]:
+            if spring.start == anchor or spring.end == anchor:
+                self.springs.remove(spring)
+
+        self.anchors.remove(anchor)
+
     def update(self):
         for anchor in self.anchors[:]:
             if anchor.pos.magnitude_squared() > 2000:
-                self.anchors.remove(anchor)
+                self.remove_anchor(anchor)
+
         # apply the forces from the springs
         for spring in self.springs:
             spring.apply()
@@ -238,7 +261,7 @@ class Simulation(threading.Thread):
         if self.gravity_enabled:
             # apply gravity
             for anchor in self.anchors:
-                anchor.apply(self.gravity)
+                anchor.apply(Force(self.gravity * anchor._mass))
         
         # update positions
         for anchor in self.anchors:

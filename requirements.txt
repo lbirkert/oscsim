@@ -1,4 +1,4 @@
 pygame==2.6.0
-thorpy
-numpy
-pillow
+thorpy==2.1.8
+numpy==2.0.1
+pillow==10.4.0
