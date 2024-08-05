@@ -7,6 +7,8 @@ class UI:
     gravity_enabled: tp.Checkbox
     gravity_x_input: tp.TextInput
     gravity_y_input: tp.TextInput
+    settings: tp.TitleBox
+    _show: bool
 
     def __init__(self, screen: pygame.Surface, sim: Simulation):
         self.sim = sim
@@ -27,11 +29,24 @@ class UI:
             gravity_text, self.gravity_enabled, x_text, self.gravity_x_input, y_text, self.gravity_y_input, unit_text
         ], "h")
 
-        settings = tp.TitleBox("Settings", [
+        self.settings = tp.TitleBox("Settings", [
             group,
         ])
-        settings.center_on(screen)
-        self.updater = settings.get_updater()
+        self.settings.center_on(screen)
+        self.updater = self.settings.get_updater()
+        self._show = False
+
+    def toggle_show(self):
+        self._show = not self._show
+
+    def show(self):
+        self._show = True
+
+    def hide(self):
+        self._show = False
+
+    def resize(self, screen: pygame.Surface):
+        self.settings.center_on(screen)
 
     def update_gravity_enabled(self):
         self.sim.gravity_enabled = not self.gravity_enabled.get_value()
@@ -50,4 +65,5 @@ class UI:
 
 
     def update(self, events):
-        self.updater.update(events=events)
+        if self._show:
+            self.updater.update(events=events)

@@ -31,6 +31,10 @@ try:
             if event.type == pygame.QUIT:
                 running = False
 
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_SPACE:
+                    ui.toggle_show()
+
             if event.type == pygame.MOUSEBUTTONDOWN:
                 drag_mouse_start = pygame.Vector2(pygame.mouse.get_pos())
                 drag_camera_start = camera.pos
@@ -50,6 +54,7 @@ try:
                     camera.zoom /= 1.1
 
             if event.type == pygame.VIDEORESIZE:
+                ui.resize(screen)
                 render.resize()
         
         screen.fill("black")
