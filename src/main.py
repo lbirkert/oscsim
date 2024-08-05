@@ -1,6 +1,6 @@
 import pygame
 import os
-from sim import Simulation
+from sim import Simulation, Anchor
 from render import Render, Camera
 from grid import render_grid
 from ui import UI
@@ -21,6 +21,7 @@ records = []
 
 drag_mouse_start = None
 drag_camera_start = None
+drag_anchor = None
 
 imgs = {}
 
@@ -48,15 +49,30 @@ try:
                     ui.toggle_show()
 
             if event.type == pygame.MOUSEBUTTONDOWN:
-                drag_mouse_start = pygame.Vector2(pygame.mouse.get_pos())
-                drag_camera_start = camera.pos
+                pos = pygame.mouse.get_pos()
+                anchor_rect = pygame.Rect((render.width - 64, render.height - 64), (64, 64))
+                if anchor_rect.collidepoint(pos):
+                    print("kekw")
+                    drag_anchor = Anchor(static=True)
+                    sim.anchors.append(drag_anchor)
+                else:
+                    drag_mouse_start = pygame.Vector2(pos)
+                    drag_camera_start = camera.pos
             
-            if drag_mouse_start is not None and event.type == pygame.MOUSEMOTION:
+            if event.type == pygame.MOUSEMOTION:
                 now = pygame.Vector2(pygame.mouse.get_pos())
-                delta = render.untransform_delta(drag_mouse_start - now)
-                camera.pos = drag_camera_start + delta
+                if drag_anchor is not None:
+                    drag_anchor.pos = render.untransform_point(now)
+                    print(drag_anchor.pos)
+                if drag_mouse_start is not None:
+                    delta = render.untransform_delta(drag_mouse_start - now)
+                    camera.pos = drag_camera_start + delta
                 
             if event.type == pygame.MOUSEBUTTONUP:
+                if drag_anchor is not None:
+                    drag_anchor.static = False
+                    drag_anchor.update_coef()
+                    drag_anchor = None
                 drag_mouse_start = None
 
             if event.type == pygame.MOUSEWHEEL:

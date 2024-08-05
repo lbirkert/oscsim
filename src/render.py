@@ -27,7 +27,7 @@ class Camera:
     
     def untransform_point(self, point: pygame.Vector2):
         point.y *= -1
-        return point / self.zoom - self.pos
+        return point / self.zoom + self.pos
     
     def untransform_delta(self, delta: pygame.Vector2):
         delta.y *= -1
@@ -116,7 +116,7 @@ class Render:
         return self.width - self.pixels / 2, self.height - self.pixels / 2
     
     def untransform_point(self, point: pygame.Vector2):
-        return self.offset - self.camera.untransform_point(point / self.pixels)
+        return self.camera.untransform_point((point - self.offset) / self.pixels)
     
     def untransform_delta(self, delta: pygame.Vector2):
         return self.camera.untransform_delta(delta / self.pixels)

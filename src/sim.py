@@ -28,7 +28,10 @@ class Anchor:
         self.static = static
         # in kilograms
         self.mass = mass
-        self.coef = 0 if static else 1 / mass
+        self.update_coef()
+
+    def update_coef(self):
+        self.coef = 0 if self.static else 1 / self.mass
     
     # Apply a force to this anchor
     # F = m * a
@@ -191,6 +194,9 @@ class Simulation(threading.Thread):
             time.sleep(SIM_TO_REAL * TIMESTEP)
 
     def update(self):
+        for anchor in self.anchors[:]:
+            if anchor.pos.magnitude_squared() > 2000:
+                self.anchors.remove(anchor)
         # apply the forces from the springs
         for spring in self.springs:
             spring.apply()
