@@ -1,6 +1,6 @@
 import pygame
 import os
-from sim import Simulation, Anchor
+from sim import Simulation, Anchor, ConstantSpring, HookesSpring, QuadraticSpring, HyperbolicSpring
 from render import Render, Camera
 from grid import render_grid
 from ui import UI
@@ -23,6 +23,7 @@ drag_mouse_start = None
 drag_camera_start = None
 drag_anchor = None
 
+
 imgs = {}
 
 for name in os.listdir("imgs"):
@@ -39,6 +40,7 @@ try:
 
         # process events sent by pygame
         events = pygame.event.get()
+        mouse_pos = pygame.Vector2(pygame.mouse.get_pos())
         for event in events:
             if event.type == pygame.QUIT:
                 running = False
@@ -48,32 +50,63 @@ try:
                     sim.toggle()
                     ui.toggle_show()
 
-            if event.type == pygame.MOUSEBUTTONDOWN:
-                pos = pygame.mouse.get_pos()
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                print(event)
+
+                springs = [
+                    ConstantSpring,
+                    HookesSpring,
+                    QuadraticSpring,
+                    HyperbolicSpring,
+                ]
+                        
+                i = 128
+                for spring in springs:
+                    rect = pygame.Rect((render.width - i, render.height - 64), (64, 64))
+                    if rect.collidepoint(mouse_pos):
+                        selected = [x for x in sim.anchors if x.selected]
+                        print("SPRING!!")
+                        for i in range(len(selected) - 1):
+                            sim.springs.append(spring(start=selected[i], end=selected[i+1]))
+                        break
+
+                    i += 64
+
                 anchor_rect = pygame.Rect((render.width - 64, render.height - 64), (64, 64))
-                if anchor_rect.collidepoint(pos):
-                    print("kekw")
-                    drag_anchor = Anchor(static=True)
+                if anchor_rect.collidepoint(mouse_pos):
+                    drag_anchor = Anchor(lock=True)
+                    drag_anchor.selected = True
                     sim.anchors.append(drag_anchor)
-                else:
-                    drag_mouse_start = pygame.Vector2(pos)
+
+                for anchor in sim.anchors:
+                    if anchor.get_rect(render).collidepoint(mouse_pos):
+                        anchor.selected = True
+                        anchor.lock()
+                        drag_anchor = anchor
+
+                if drag_anchor is None:
+                    drag_mouse_start = mouse_pos
                     drag_camera_start = camera.pos
             
             if event.type == pygame.MOUSEMOTION:
-                now = pygame.Vector2(pygame.mouse.get_pos())
                 if drag_anchor is not None:
-                    drag_anchor.pos = render.untransform_point(now)
+                    drag_anchor.pos = render.untransform_point(mouse_pos)
                     print(drag_anchor.pos)
                 if drag_mouse_start is not None:
-                    delta = render.untransform_delta(drag_mouse_start - now)
+                    delta = render.untransform_delta(drag_mouse_start - mouse_pos)
                     camera.pos = drag_camera_start + delta
                 
             if event.type == pygame.MOUSEBUTTONUP:
+                if drag_mouse_start is not None:
+                    if (drag_mouse_start - mouse_pos).magnitude_squared() < 10:
+                        # unselect everything
+                        for anchor in sim.anchors:
+                            anchor.selected = False
+                    drag_mouse_start = None
+
                 if drag_anchor is not None:
-                    drag_anchor.static = False
-                    drag_anchor.update_coef()
+                    drag_anchor.unlock()
                     drag_anchor = None
-                drag_mouse_start = None
 
             if event.type == pygame.MOUSEWHEEL:
                 if event.y > 0:
@@ -96,6 +129,9 @@ try:
             anchor.render(render)
 
         records.append(sim.anchors[1].pos.copy())
+        
+        if len(records) > 200:
+            records.pop(0)
 
         if len(records) > 2:
             recs = records[::-1]

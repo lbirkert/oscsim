@@ -22,16 +22,25 @@ class Force:
 
 # An anchor is a point on which force can be applied to for moving the point
 class Anchor:
-    def __init__(self, pos=(0,0), vel=(0,0), static=False, mass=1):
+    selected: bool
+
+    def __init__(self, pos=(0,0), vel=(0,0), static=False, lock=False, mass=1):
         self.pos = pygame.Vector2(pos)
         self.vel = pygame.Vector2(vel)
-        self.static = static
+        self._static = static
+        self._lock = lock
         # in kilograms
         self.mass = mass
+        self.selected = False
         self.update_coef()
+        self.update_radius()
 
     def update_coef(self):
-        self.coef = 0 if self.static else 1 / self.mass
+        self.coef = 0 if self._static or self._lock else 1 / self.mass
+
+    def update_radius(self):
+        SIZE_RATIO = 0.10876
+        self.radius = math.sqrt(self.mass) * SIZE_RATIO
     
     # Apply a force to this anchor
     # F = m * a
@@ -42,11 +51,36 @@ class Anchor:
     def update(self):
         self.pos += TIMESTEP * self.vel
 
+    def set_static(self, val: bool):
+        self._static = val
+        if self._static:
+            self.vel = pygame.Vector2((0, 0))
+        self.update_coef()
+
+    def lock(self):
+        self._lock = True
+        self.coef = 0
+        self.vel = pygame.Vector2((0, 0))
+
+    def unlock(self):
+        self._lock = False
+        self.update_coef()
+
+    def get_rect(self, render: Render):
+        center = render.transform_point(self.pos)
+        radius = render.transform_size(self.radius)
+
+        return pygame.Rect(center - pygame.Vector2(radius, radius), (2 * radius, 2 * radius))
+
     def render(self, render: Render):
-        SIZE_RATIO = 0.10876
-        radius = math.sqrt(self.mass) * SIZE_RATIO
-        color = (100, 100, 100) if self.static else (255, 255, 255)
-        render.draw_circle(color, self.pos, radius)
+        if self.selected:
+            color = (0, 255, 100)
+        elif self._static:
+            color = (150, 150, 150)
+        else:
+            color = (255, 255, 255)
+
+        render.draw_circle(color, self.pos, self.radius)
 
 class Spring(ABC):
     start: Anchor
@@ -108,7 +142,7 @@ class Spring(ABC):
 
 # A spring whose foce applied when compressed is proportional to the compressed distance
 class HookesSpring(Spring):
-    def __init__(self, stiffness: float, **kwargs):
+    def __init__(self, stiffness: float = 10, **kwargs):
         super().__init__(**kwargs)
         self.stiffness = stiffness
     
@@ -117,7 +151,7 @@ class HookesSpring(Spring):
 
 # A spring whose foce applied when compressed is quadratic to the compressed distance
 class QuadraticSpring(Spring):
-    def __init__(self, stiffness: float, **kwargs):
+    def __init__(self, stiffness: float = 10, **kwargs):
         super().__init__(**kwargs)
         self.stiffness = stiffness
 
@@ -126,7 +160,7 @@ class QuadraticSpring(Spring):
 
 # A spring whose foce applied when compressed is constant
 class ConstantSpring(Spring):
-    def __init__(self, stiffness: float, **kwargs):
+    def __init__(self, stiffness: float = 10, **kwargs):
         super().__init__(**kwargs)
         self.stiffness = stiffness
 
@@ -135,7 +169,7 @@ class ConstantSpring(Spring):
 
 # A spring whose foce applied when compressed is antiproportional to the compressed amount (with a maximum)
 class HyperbolicSpring(Spring):
-    def __init__(self, stiffness: float, **kwargs):
+    def __init__(self, stiffness: float = 10, **kwargs):
         super().__init__(**kwargs)
         self.stiffness = stiffness
     
