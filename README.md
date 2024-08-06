@@ -3,6 +3,8 @@
 A physics based simulation game to play around with
 oscillating things written in Python.
 
+[view the demo](https://github.com/lbirkert/oscsim/raw/main/demo.mp4)
+
 ----
 
 ### Quickstart
