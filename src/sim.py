@@ -49,7 +49,8 @@ class Anchor:
     
     # Update the position of this anchor
     def update(self):
-        self.pos += TIMESTEP * self.vel
+        if not self._lock:
+            self.pos += TIMESTEP * self.vel
 
     def set_mass(self, val: float):
         self._mass = val
@@ -71,7 +72,7 @@ class Anchor:
     def lock(self):
         self._lock = True
         self.coef = 0
-        self.vel = pygame.Vector2((0, 0))
+        # self.vel = pygame.Vector2((0, 0))
 
     def unlock(self):
         self._lock = False
