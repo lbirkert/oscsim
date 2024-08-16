@@ -84,6 +84,9 @@ class Anchor:
 
         return pygame.Rect(center - pygame.Vector2(radius, radius), (2 * radius, 2 * radius))
 
+    def clicked(self, render: Render, point: pygame.Vector2):
+        return self.get_rect(render).collidepoint(point)
+
     def render(self, render: Render):
         if self.selected:
             color = (0, 255, 100)
@@ -97,12 +100,14 @@ class Anchor:
 class Spring(ABC):
     start: Anchor
     end: Anchor
+    selected: bool
 
     def __init__(self, **kwargs):
         self.start = kwargs.get("start", Anchor((0, 0)))
         self.end = kwargs.get("end", Anchor(self.start.pos))
         self.max_force = kwargs.get("max_force")
         self.min_force = kwargs.get("min_force")
+        self.selected = False
 
         assert isinstance(self.start, Anchor)
         assert isinstance(self.end, Anchor)
@@ -149,8 +154,25 @@ class Spring(ABC):
             points.append(self.start.pos + off_delta + off_normal)
 
         points.append(self.end.pos)
+        
+        if self.selected:
+            color = (0, 255, 100)
+        elif self.stiffness < 0:
+            color = (232, 38, 4)
+        else:
+            color = (237, 248, 100)
 
-        render.draw_lines((237, 248, 100), False, points, width=0.05)
+        render.draw_lines(color, False, points, width=0.05)
+    
+    def get_rect(self, render: Render):
+        center = render.transform_point(0.5 * (self.start.pos + self.end.pos))
+        radius = render.transform_size(0.4)
+
+        return pygame.Rect(center - pygame.Vector2(radius, radius), (2 * radius, 2 * radius))
+    
+    def clicked(self, render: Render, point: pygame.Vector2):
+        return self.get_rect(render).collidepoint(point)
+
 
 # A spring whose foce applied when compressed is proportional to the compressed distance
 class HookesSpring(Spring):
@@ -213,6 +235,7 @@ class Simulation(threading.Thread):
             # QuadraticSpring(stiffness=2, start=self.anchors[1], end=self.anchors[2]),
             # QuadraticSpring(stiffness=2, start=self.anchors[0], end=self.anchors[2]),
         ]
+        self.entities = self.anchors + self.springs
         self.records = []
     
     def toggle(self):
@@ -240,15 +263,27 @@ class Simulation(threading.Thread):
             time.sleep(SIM_TO_REAL * TIMESTEP)
 
     def unselect(self):
-        for anchor in self.anchors:
-            anchor.selected = False
+        for entity in self.entities:
+            entity.selected = False
 
     def remove_anchor(self, anchor: Anchor):
         for spring in self.springs[:]:
-            if spring.start == anchor or spring.end == anchor:
+            if spring.start == anchor or spring.end == anchor and spring in self.springs:
                 self.springs.remove(spring)
+                self.entities.remove(spring)
 
         self.anchors.remove(anchor)
+        self.entities.remove(anchor)
+
+    def remove_spring(self, spring: Spring):
+        self.springs.remove(spring)
+        self.entities.remove(spring)
+
+    def remove(self, entity):
+        if isinstance(entity, Anchor):
+            self.remove_anchor(entity)
+        elif isinstance(entity, Spring):
+            self.remove_spring(entity)
 
     def update(self):
         for anchor in self.anchors[:]:

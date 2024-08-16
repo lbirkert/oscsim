@@ -1,10 +1,10 @@
 import pygame
 import os
 import time
-from sim import Simulation, Anchor, ConstantSpring, HookesSpring, QuadraticSpring, HyperbolicSpring
+from sim import Simulation, Anchor, ConstantSpring, HookesSpring, QuadraticSpring, HyperbolicSpring, Spring
 from render import Render, Camera
 from grid import render_grid
-from ui import UI
+from ui import SettingsUI, AnchorUI, SpringUI
 
 sim = Simulation()
 sim.start()
@@ -16,9 +16,12 @@ clock = pygame.time.Clock()
 
 camera = Camera()
 render = Render(screen, camera)
-ui = UI(screen, sim)
+settings_ui = SettingsUI(screen, sim)
+entity_ui = None
+ui_show = False
 
 records = []
+previous_selection = []
 
 drag_mouse_start = None
 drag_camera_start = None
@@ -46,7 +49,7 @@ for name in os.listdir("imgs"):
 try: 
     while running:
         time_delta = clock.tick(60) / 1000.0
-        selected = [x for x in sim.anchors if x.selected]
+        selected = [x for x in sim.entities if x.selected]
 
         # process events sent by pygame
         events = pygame.event.get()
@@ -58,12 +61,12 @@ try:
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_SPACE:
                     sim.toggle()
-                    ui.toggle_show()
+                    ui_show = not ui_show
 
                 if event.key == pygame.K_BACKSPACE:
-                    for anchor in sim.anchors[:]:
-                        if anchor.selected:
-                            sim.remove_anchor(anchor)
+                    for entity in sim.entities[:]:
+                        if entity.selected and entity in sim.entities:
+                            sim.remove(entity)
 
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                 drag_start = time.time()
@@ -78,7 +81,9 @@ try:
                     rect = pygame.Rect((render.width - i, render.height - 64), (64, 64))
                     if rect.collidepoint(mouse_pos):
                         for i in range(len(selected) - 1):
-                            sim.springs.append(spring(start=selected[i], end=selected[i+1]))
+                            spring = spring(start=selected[i], end=selected[i+1])
+                            sim.springs.append(spring)
+                            sim.entities.append(spring)
                         break
 
                     i += 64
@@ -90,14 +95,16 @@ try:
                     drag_anchor = Anchor(lock=True)
                     drag_anchor.selected = True
                     sim.anchors.append(drag_anchor)
+                    sim.entities.append(drag_anchor)
 
-                for anchor in sim.anchors:
-                    if anchor.get_rect(render).collidepoint(mouse_pos):
+                for entity in sim.entities:
+                    if entity.clicked(render, mouse_pos):
                         if unselect:
                             sim.unselect()
-                        anchor.selected = True
-                        anchor.lock()
-                        drag_anchor = anchor
+                        entity.selected = True
+                        if isinstance(entity, Anchor):
+                            entity.lock()
+                            drag_anchor = entity
                         break
 
                 if drag_anchor is None:
@@ -135,7 +142,9 @@ try:
                     camera.zoom /= 1.1
 
             if event.type == pygame.VIDEORESIZE:
-                ui.resize(screen)
+                settings_ui.resize(screen)
+                if entity_ui is not None:
+                    entity_ui.resize(screen)
                 render.resize()
         
         screen.fill("black")
@@ -148,7 +157,7 @@ try:
         for anchor in sim.anchors:
             anchor.render(render)
         
-        if len(selected) > 0:
+        if len(selected) > 0 and isinstance(selected[0], Anchor):
             anchor = selected[0]
             records.append(anchor.pos.copy())
 
@@ -171,15 +180,28 @@ try:
         for name in icons:
             screen.blit(imgs[name], pygame.Rect((render.width - i, render.height - 64), (64, 64)))
             i += 64
+            
+        if selected != previous_selection:
+            if len(selected) == 1:
+                if isinstance(selected[0], Anchor):
+                    entity_ui = AnchorUI(selected[0])
+                elif isinstance(selected[0], Spring):
+                    entity_ui = SpringUI(selected[0])
+                entity_ui.resize(screen)
+
+            if len(selected) != 1:
+                entity_ui = None
+            previous_selection = selected
+
         
         # hide UI when moving mouse
-        if drag_anchor is None and \
+        if ui_show and (drag_anchor is None and \
             (drag_mouse_start is None or \
-                (drag_mouse_start - mouse_pos).magnitude_squared() < 10):
-            ui.update(events)
+                (drag_mouse_start - mouse_pos).magnitude_squared() < 10)):
+            settings_ui.update(events)
+            if entity_ui is not None:
+                entity_ui.update(events)
 
-            if len(selected) == 1:
-                ui.update_anchor(events, selected[0])
 
 
         pygame.display.flip()
